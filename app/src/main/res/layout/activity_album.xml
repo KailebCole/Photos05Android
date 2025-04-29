@@ -18,10 +18,20 @@
     <GridView
         android:id="@+id/photoGridView"
         android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:numColumns="3"
+        android:verticalSpacing="8dp"
+        android:horizontalSpacing="8dp"
+        android:stretchMode="columnWidth"
+        android:gravity="center"/>
+
+    <Button
+        android:id="@+id/addPhotoButton"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:columnWidth="100dp"
-        android:numColumns="auto_fit"
-        android:verticalSpacing="10dp"
-        android:horizontalSpacing="10dp"
-        android:stretchMode="columnWidth" />
+        android:text="Add Photo"
+        android:layout_marginTop="10dp"
+        android:background="@color/dark_magenta"
+        android:textColor="#FFFFFF"/>
 </LinearLayout>

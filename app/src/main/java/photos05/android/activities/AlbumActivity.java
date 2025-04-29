@@ -36,6 +36,9 @@ public class AlbumActivity extends AppCompatActivity{
         // Set up photo album grid
         gridView = findViewById(R.id.photoGridView);
 
+        // Get User
+        user = DataManager.loadUser(this);
+
         // Get the album information from the previous intent
         String albumName = getIntent().getStringExtra("albumName");
         currentAlbum = user.getAlbumByName(albumName);
@@ -57,8 +60,8 @@ public class AlbumActivity extends AppCompatActivity{
             String path = photoPaths.get(position);
             Intent intent = new Intent(this, PhotoViewerActivity.class);
             intent.putExtra("photoPath", path);
+            intent.putExtra("albumName", currentAlbum.getName());
             startActivity(intent);
         });
-
     }
 }
