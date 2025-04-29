@@ -30,6 +30,6 @@
         android:layout_height="wrap_content"
         android:text="Create New Album"
         android:layout_marginTop="12dp"
-        android:background="@color/purple_500"
+        android:background="@color/dark_magenta"
         android:textColor="#ffffff"/>
 </LinearLayout>
