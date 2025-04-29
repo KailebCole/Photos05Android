@@ -7,6 +7,7 @@ import android.provider.OpenableColumns;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.GridView;
 import android.widget.Toast;
 
@@ -18,6 +19,7 @@ import photos05.android.model.Photo;
 import photos05.android.model.User;
 import photos05.android.util.DataManager;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,6 +30,8 @@ public class AlbumActivity extends AppCompatActivity{
     private Album currentAlbum;
     private User user;
 
+    private static final int PICK_IMAGE_REQUEST = 1;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -35,6 +39,10 @@ public class AlbumActivity extends AppCompatActivity{
 
         // Set up photo album grid
         gridView = findViewById(R.id.photoGridView);
+
+        // Set up add photo button
+        Button addPhotoButton = findViewById(R.id.addPhotoButton);
+        addPhotoButton.setOnClickListener(v -> openImagePicker());
 
         // Get User
         user = DataManager.loadUser(this);
@@ -64,4 +72,47 @@ public class AlbumActivity extends AppCompatActivity{
             startActivity(intent);
         });
     }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == PICK_IMAGE_REQUEST && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            Uri imageUri = data.getData();
+            addPhotoToAlbum(imageUri.toString());
+        }
+    }
+
+    private void addPhotoToAlbum(String path) {
+        // Prevent duplicate photos
+        for (Photo p : currentAlbum.getPhotos()) {
+            if (p.getFilePath().equals(path)) {
+                Toast.makeText(this, "Photo already exists in album", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+
+        try {
+            Photo newPhoto = new Photo(path);
+            currentAlbum.addPhoto(newPhoto);
+
+            photoPaths.add(path);
+            adapter.notifyDataSetChanged();
+            DataManager.saveUser(user, this);
+
+            Toast.makeText(this, "Photo added successfully!", Toast.LENGTH_SHORT).show();
+        } catch (IOException e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Failed to add photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+
+    private void openImagePicker() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.setType("image/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(intent, PICK_IMAGE_REQUEST);
+    }
+
 }
