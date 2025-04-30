@@ -5,6 +5,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
@@ -42,11 +43,21 @@ public class AlbumActivity extends AppCompatActivity{
     private User user;
 
     private static final int PICK_IMAGE_REQUEST = 1;
+    private int screenWidth;
+    private int screenHeight;
+    private int squareImageSideLength;
+    private int padding = 8;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_album);
+
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        screenWidth = metrics.widthPixels;
+        screenHeight = metrics.heightPixels;
+        squareImageSideLength = ((screenWidth - padding) / 3);
 
         //add photo button
         Button addPhotoButton = findViewById(R.id.addPhotoButton);
@@ -56,10 +67,6 @@ public class AlbumActivity extends AppCompatActivity{
         }
         // Set a click listener on the button to open the image picker
         addPhotoButton.setOnClickListener(v -> addPhoto());
-
-        // Set up add photo button
-        Button addPhotoButton = findViewById(R.id.addPhotoButton);
-        addPhotoButton.setOnClickListener(v -> openImagePicker());
 
         // Get User
         user = DataManager.loadUser(this);
@@ -78,9 +85,9 @@ public class AlbumActivity extends AppCompatActivity{
                 ImageView imageView;
                 if (convertView == null) {
                     imageView = new ImageView(getContext());
-                    imageView.setLayoutParams(new GridView.LayoutParams(200, 200)); // Adjust size as needed
+                    imageView.setLayoutParams(new GridView.LayoutParams(squareImageSideLength, squareImageSideLength));
                     imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                    imageView.setPadding(8, 8, 8, 8); // Add padding
+                    imageView.setPadding(padding, padding, padding, padding);
                 } else {
                     imageView = (ImageView) convertView;
                 }
@@ -162,13 +169,4 @@ public class AlbumActivity extends AppCompatActivity{
             Toast.makeText(this, "Failed to add photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
-
-
-    private void openImagePicker() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.setType("image/*");
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(intent, PICK_IMAGE_REQUEST);
-    }
-
 }
