@@ -1,17 +1,27 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="12dp">
 
-    <ImageView
-        android:id="@+id/fullImageView"
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:adjustViewBounds="true"
-        android:scaleType="centerCrop"
-        android:contentDescription="Photo" />
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/fullImageView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:adjustViewBounds="true"
+            android:scaleType="centerCrop"
+            android:layout_margin="12dp"
+            android:contentDescription="Displayed Photo"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintDimensionRatio="1:1" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <TextView
         android:id="@+id/captionTextView"
@@ -34,19 +44,29 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_horizontal">
+        android:gravity="center"
+        android:layout_marginTop="12dp">
 
         <Button
             android:id="@+id/prevButton"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="Previous" />
 
         <Button
-            android:id="@+id/nextButton"
-            android:layout_width="wrap_content"
+            android:id="@+id/deletePhotoButton"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Next"
-            android:layout_marginStart="24dp"/>
+            android:layout_weight="1"
+            android:text="Delete" />
+
+        <Button
+            android:id="@+id/nextButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Next" />
     </LinearLayout>
+
 </LinearLayout>

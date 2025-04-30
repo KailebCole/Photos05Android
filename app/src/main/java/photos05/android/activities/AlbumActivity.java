@@ -20,6 +20,7 @@ import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import photos05.android.R;
@@ -130,6 +131,25 @@ public class AlbumActivity extends AppCompatActivity{
             startActivity(intent);
         });
 
+        // Long click image
+        gridView.setOnItemLongClickListener((parent, view, position, id) -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("Delete Photo")
+                    .setMessage("Are you sure you want to delete this photo from the album?")
+                    .setPositiveButton("Delete", (dialog, which) -> {
+                        String path = photoPaths.get(position);
+                        currentAlbum.getPhotos().removeIf(photo -> photo.getFilePath().equals(path));
+                        photoPaths.remove(position);
+                        adapter.notifyDataSetChanged();
+                        DataManager.saveUser(user, this);
+                        Toast.makeText(this, "Photo deleted", Toast.LENGTH_SHORT).show();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+
+            return true;
+        });
+
         // Implement Save/Load Capability
         selectPhotoLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
@@ -184,5 +204,23 @@ public class AlbumActivity extends AppCompatActivity{
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
         intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
         selectPhotoLauncher.launch(intent);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        user = DataManager.loadUser(this);
+        String albumName = getIntent().getStringExtra("albumName");
+        currentAlbum = user.getAlbumByName(albumName);
+
+        photoPaths.clear();
+        if (currentAlbum != null) {
+            for (Photo p : currentAlbum.getPhotos()) {
+                photoPaths.add(p.getFilePath());
+            }
+        }
+
+        adapter.notifyDataSetChanged();
     }
 }

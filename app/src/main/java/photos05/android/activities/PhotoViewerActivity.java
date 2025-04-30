@@ -10,6 +10,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.util.List;
@@ -74,6 +75,24 @@ public class PhotoViewerActivity extends AppCompatActivity {
             }
         });
 
+        Button deletePhotoButton = findViewById(R.id.deletePhotoButton);
+        deletePhotoButton.setOnClickListener(v -> {
+            if (!photos.isEmpty()) {
+                Photo toDelete = photos.get(currentIndex);
+                photos.remove(currentIndex);
+                currentAlbum.getPhotos().remove(toDelete);
+                DataManager.saveUser(user, this);
+                Toast.makeText(this, "Photo deleted", Toast.LENGTH_SHORT).show();
+
+                if (photos.isEmpty()) {
+                    finish(); // Exit viewer if no more photos
+                } else {
+                    currentIndex = Math.min(currentIndex, photos.size() - 1);
+                    updatePhotoView();
+                }
+            }
+        });
+
         gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
             private static final int SWIPE_THRESHOLD = 100;
             private static final int SWIPE_VELOCITY_THRESHOLD = 100;
@@ -94,6 +113,31 @@ public class PhotoViewerActivity extends AppCompatActivity {
         });
 
         imageView.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
+
+        imageView.setOnLongClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("Delete Photo")
+                    .setMessage("Are you sure you want to delete this photo?")
+                    .setPositiveButton("Delete", (dialog, which) -> {
+                        if (!photos.isEmpty()) {
+                            Photo toDelete = photos.get(currentIndex);
+                            photos.remove(currentIndex);
+                            currentAlbum.getPhotos().remove(toDelete);
+                            DataManager.saveUser(user, this);
+                            Toast.makeText(this, "Photo deleted", Toast.LENGTH_SHORT).show();
+
+                            if (photos.isEmpty()) {
+                                finish();
+                            } else {
+                                currentIndex = Math.min(currentIndex, photos.size() - 1);
+                                updatePhotoView();
+                            }
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            return true;
+        });
     }
 
     private void updatePhotoView() {
