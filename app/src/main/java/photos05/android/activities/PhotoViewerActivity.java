@@ -2,10 +2,13 @@ package photos05.android.activities;
 
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -14,6 +17,7 @@ import java.util.List;
 import photos05.android.R;
 import photos05.android.model.Album;
 import photos05.android.model.Photo;
+import photos05.android.model.Tag;
 import photos05.android.model.User;
 import photos05.android.util.DataManager;
 
@@ -28,6 +32,7 @@ public class PhotoViewerActivity extends AppCompatActivity {
     private int currentIndex;
     private User user;
     private Album currentAlbum;
+    private GestureDetector gestureDetector;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,20 +45,18 @@ public class PhotoViewerActivity extends AppCompatActivity {
         nextButton = findViewById(R.id.nextButton);
         prevButton = findViewById(R.id.prevButton);
 
-        user = DataManager.loadUser(this);
         String albumName = getIntent().getStringExtra("albumName");
-        String photoPath = getIntent().getStringExtra("photoPath");
+        int index = getIntent().getIntExtra("photoIndex", 0);
 
+        user = DataManager.loadUser(this);
         currentAlbum = user.getAlbumByName(albumName);
-        photos = currentAlbum.getPhotos();
-
-        // find current photo index
-        for (int i = 0; i < photos.size(); i++) {
-            if (photos.get(i).getFilePath().equals(photoPath)) {
-                currentIndex = i;
-                break;
-            }
+        if (currentAlbum == null || currentAlbum.getPhotos().isEmpty()) {
+            Toast.makeText(this, "No photos in this album", Toast.LENGTH_LONG).show();
+            finish();
+            return;
         }
+        photos = currentAlbum.getPhotos();
+        currentIndex = Math.max(0, Math.min(index, photos.size() - 1));
 
         updatePhotoView();
 
@@ -70,12 +73,64 @@ public class PhotoViewerActivity extends AppCompatActivity {
                 updatePhotoView();
             }
         });
+
+        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            private static final int SWIPE_THRESHOLD = 100;
+            private static final int SWIPE_VELOCITY_THRESHOLD = 100;
+
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                float diffX = e2.getX() - e1.getX();
+                if (Math.abs(diffX) > SWIPE_THRESHOLD && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
+                    if (diffX > 0) {
+                        showPreviousPhoto();
+                    } else {
+                        showNextPhoto();
+                    }
+                    return true;
+                }
+                return false;
+            }
+        });
+
+        imageView.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
     }
 
     private void updatePhotoView() {
         Photo currentPhoto = photos.get(currentIndex);
-        imageView.setImageURI(Uri.parse(currentPhoto.getFilePath()));
-        captionText.setText(currentPhoto.getCaption());
-        //tagListText.setText(currentPhoto.getTagString());
+        Uri photoUri = Uri.parse(currentPhoto.getFilePath());
+
+        // Display the image
+        imageView.setImageURI(photoUri);
+
+        // Extract file name
+        String fileName = photoUri.getLastPathSegment();
+        captionText.setText(fileName != null ? fileName : "Unknown");
+
+        // Display tags
+        List<Tag> tags = currentPhoto.getTags();
+        if (tags.isEmpty()) {
+            tagListText.setText("Tags: None");
+        } else {
+            StringBuilder tagDisplay = new StringBuilder("Tags:");
+            for (Tag tag : tags) {
+                tagDisplay.append("\n• ").append(tag.getName()).append(": ").append(tag.getValue());
+            }
+            tagListText.setText(tagDisplay.toString());
+        }
+    }
+
+    private void showNextPhoto() {
+        if (currentIndex < photos.size() - 1) {
+            currentIndex++;
+            updatePhotoView();
+        }
+    }
+
+    private void showPreviousPhoto() {
+        if (currentIndex > 0) {
+            currentIndex--;
+            updatePhotoView();
+        }
     }
 }

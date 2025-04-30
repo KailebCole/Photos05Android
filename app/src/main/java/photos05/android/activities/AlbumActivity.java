@@ -1,6 +1,9 @@
 package photos05.android.activities;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -29,6 +32,8 @@ import java.io.IOException;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import photos05.android.R;
@@ -42,24 +47,23 @@ public class AlbumActivity extends AppCompatActivity{
     private Album currentAlbum;
     private User user;
 
-    private static final int PICK_IMAGE_REQUEST = 1;
     private int screenWidth;
-    private int screenHeight;
     private int squareImageSideLength;
     private int padding = 8;
 
+    @SuppressLint("WrongConstant")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_album);
 
+        // Image Sizes based on Screen Size
         DisplayMetrics metrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(metrics);
         screenWidth = metrics.widthPixels;
-        screenHeight = metrics.heightPixels;
         squareImageSideLength = ((screenWidth - padding) / 3);
 
-        //add photo button
+        // Add photo button
         Button addPhotoButton = findViewById(R.id.addPhotoButton);
         if (addPhotoButton == null) {
             Log.e(TAG, "onCreate: Button not found!");
@@ -70,10 +74,10 @@ public class AlbumActivity extends AppCompatActivity{
 
         // Get User
         user = DataManager.loadUser(this);
-      
+
         Log.d(TAG, "onCreate: Add Photo Button created");
 
-        //set up grid view
+        // Set up grid view
         gridView = findViewById(R.id.photoGridView);
         if (gridView == null) {
             Log.e(TAG, "onCreate: GridView not found!");
@@ -92,35 +96,79 @@ public class AlbumActivity extends AppCompatActivity{
                     imageView = (ImageView) convertView;
                 }
 
-                // Load the image into the ImageView
-                imageView.setImageURI(Uri.parse(getItem(position)));
+                Uri uri = Uri.parse(getItem(position));
+                try (InputStream stream = getContentResolver().openInputStream(uri)) {
+                    Bitmap bitmap = BitmapFactory.decodeStream(stream);
+                    imageView.setImageBitmap(bitmap);
+                } catch (IOException | SecurityException e) {
+                    Log.e(TAG, "Failed to load image for URI: " + uri, e);
+                    imageView.setImageResource(android.R.drawable.ic_menu_report_image); // fallback image
+                }
 
                 return imageView;
             }
         };
 
         gridView.setAdapter(adapter);
-        //set up SAF launcher
+
+        // Get the album name from intent and load album
+        String albumName = getIntent().getStringExtra("albumName");
+        if (albumName != null) {
+            currentAlbum = user.getAlbumByName(albumName);
+            if (currentAlbum != null) {
+                for (Photo p : currentAlbum.getPhotos()) {
+                    photoPaths.add(p.getFilePath());
+                }
+            }
+        }
+
+        // Set listener on each image to allow the user to open an image
+        gridView.setOnItemClickListener((parent, view, position, id) -> {
+            Intent intent = new Intent(this, PhotoViewerActivity.class);
+            intent.putExtra("albumName", currentAlbum.getName());
+            intent.putExtra("photoIndex", position);
+            startActivity(intent);
+        });
+
+        // Implement Save/Load Capability
         selectPhotoLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        // Get the URI of the selected file
-                        Uri uri = result.getData().getData();
+                        Intent data = result.getData();
+                        Uri uri = data.getData();
                         if (uri != null) {
-                            Log.d(TAG, "onActivityResult: File URI: " + uri);
-                            // Add the path of the image to the photoPaths
-                            if (!photoPaths.contains(uri.toString())) {
-                                photoPaths.add(uri.toString());
-                            } else {
-                                Toast.makeText(this, "This Photo Already Exists in this album!", Toast.LENGTH_SHORT).show();
+                            // Persist access
+                            final int takeFlags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+
+                            try {
+                                getContentResolver().takePersistableUriPermission(uri, takeFlags);
                             }
-                            //Notify that the dataset has changed
-                            adapter.notifyDataSetChanged();
-                            Toast.makeText(this, "Photo Path added", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Log.d(TAG, "onActivityResult: File URI does not exist");
-                            Toast.makeText(this, "Error selecting file", Toast.LENGTH_SHORT).show();
+                            catch (SecurityException e) {
+                                Log.e(TAG, "URI permission error", e);
+                            }
+
+                            String path = uri.toString();
+
+                            // Prevent duplicates
+                            if (currentAlbum.getPhotos().stream().anyMatch(p -> p.getFilePath().equals(path))) {
+                                Toast.makeText(this, "This photo already exists in the album!", Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+
+                            try {
+                                Photo photo = new Photo(path);
+                                currentAlbum.addPhoto(photo);
+                                photoPaths.add(path);
+                                adapter.notifyDataSetChanged();
+
+                                // Persist user data
+                                DataManager.saveUser(user, this);
+                                Toast.makeText(this, "Photo added and saved!", Toast.LENGTH_SHORT).show();
+                            } catch (IOException e) {
+                                Log.e(TAG, "Photo creation failed for path: " + path, e);
+                                Toast.makeText(this, "Failed to add photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                            }
                         }
                     }
                 }
@@ -131,42 +179,10 @@ public class AlbumActivity extends AppCompatActivity{
         Log.d(TAG, "addPhoto: Prompting user to select a photo");
         // Create an intent to open the SAF file picker
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.setType("image/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("image/*"); // Filter for image types only
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
+        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
         selectPhotoLauncher.launch(intent);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == PICK_IMAGE_REQUEST && resultCode == RESULT_OK && data != null && data.getData() != null) {
-            Uri imageUri = data.getData();
-            addPhotoToAlbum(imageUri.toString());
-        }
-    }
-
-    private void addPhotoToAlbum(String path) {
-        // Prevent duplicate photos
-        for (Photo p : currentAlbum.getPhotos()) {
-            if (p.getFilePath().equals(path)) {
-                Toast.makeText(this, "Photo already exists in album", Toast.LENGTH_SHORT).show();
-                return;
-            }
-        }
-
-        try {
-            Photo newPhoto = new Photo(path);
-            currentAlbum.addPhoto(newPhoto);
-
-            photoPaths.add(path);
-            adapter.notifyDataSetChanged();
-            DataManager.saveUser(user, this);
-
-            Toast.makeText(this, "Photo added successfully!", Toast.LENGTH_SHORT).show();
-        } catch (IOException e) {
-            e.printStackTrace();
-            Toast.makeText(this, "Failed to add photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
     }
 }
