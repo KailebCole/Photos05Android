@@ -72,6 +72,16 @@ public class AlbumActivity extends AppCompatActivity{
         // Set a click listener on the button to open the image picker
         addPhotoButton.setOnClickListener(v -> addPhoto());
 
+        Button searchButton = findViewById(R.id.searchButton);
+        if (searchButton == null) {
+            Log.e(TAG, "onCreate: Button not found!");
+            return;
+        }
+        // Set a click listener on the button to open the image picker
+        searchButton.setOnClickListener(v -> {
+            showSearchDialog();
+        });
+
         // Get User
         user = DataManager.loadUser(this);
 
@@ -179,6 +189,106 @@ public class AlbumActivity extends AppCompatActivity{
                     }
                 }
         );
+    }
+
+    private void showSearchDialog() {
+        final String[] modes = { "Single Tag", "Tag OR Tag", "Tag AND Tag" };
+
+        AlertDialog.Builder modeBuilder = new AlertDialog.Builder(this);
+        modeBuilder.setTitle("Select Search Mode");
+        modeBuilder.setItems(modes, (dialog, which) -> {
+            String selectedMode = modes[which];
+            promptForTags(selectedMode);
+        });
+        modeBuilder.show();
+    }
+
+    private void promptForTags(String mode) {
+        AlertDialog.Builder inputBuilder = new AlertDialog.Builder(this);
+        inputBuilder.setTitle("Enter Tag(s)");
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+
+        // First Tag
+        EditText tagNameInput1 = new EditText(this);
+        tagNameInput1.setHint("Tag 1 Name (e.g., location)");
+        layout.addView(tagNameInput1);
+
+        EditText tagValueInput1 = new EditText(this);
+        tagValueInput1.setHint("Tag 1 Value (e.g., Paris)");
+        layout.addView(tagValueInput1);
+
+        // Second Tag if needed
+        EditText tagNameInput2 = new EditText(this);
+        EditText tagValueInput2 = new EditText(this);
+
+        if (!mode.equals("Single Tag")) {
+            tagNameInput2.setHint("Tag 2 Name (e.g., activity)");
+            tagValueInput2.setHint("Tag 2 Value (e.g., running)");
+            layout.addView(tagNameInput2);
+            layout.addView(tagValueInput2);
+        }
+
+        inputBuilder.setView(layout);
+
+        inputBuilder.setPositiveButton("Search", (dialog, which) -> {
+            Tag tag1 = new Tag(tagNameInput1.getText().toString().trim(),
+                    tagValueInput1.getText().toString().trim());
+
+            Tag tag2 = null;
+            if (!mode.equals("Single Tag")) {
+                tag2 = new Tag(tagNameInput2.getText().toString().trim(),
+                        tagValueInput2.getText().toString().trim());
+            }
+
+            runTagSearch(mode, tag1, tag2);
+        });
+
+        inputBuilder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+
+        inputBuilder.show();
+    }
+
+    private void runTagSearch(String mode, Tag tag1, Tag tag2) {
+        photoPaths.clear();
+
+        for (Photo photo : currentAlbum.getPhotos()) {
+            List<Tag> tags = photo.getTags();
+
+            boolean hasTag1 = containsTag(tags, tag1);
+            boolean hasTag2 = tag2 != null && containsTag(tags, tag2);
+
+            boolean shouldInclude = false;
+
+            switch (mode) {
+                case "Single Tag":
+                    shouldInclude = hasTag1;
+                    break;
+                case "Tag OR Tag":
+                    shouldInclude = hasTag1 || hasTag2;
+                    break;
+                case "Tag AND Tag":
+                    shouldInclude = hasTag1 && hasTag2;
+                    break;
+            }
+
+            if (shouldInclude) {
+                photoPaths.add(photo.getFilePath());
+            }
+        }
+
+        adapter.notifyDataSetChanged();
+    }
+
+    private boolean containsTag(List<Tag> tags, Tag target) {
+        for (Tag tag : tags) {
+            if (tag.equals(target)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void addPhoto() {
