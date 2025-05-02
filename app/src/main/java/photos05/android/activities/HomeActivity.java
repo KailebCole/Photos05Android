@@ -47,6 +47,14 @@ public class HomeActivity extends AppCompatActivity{
         });
 
         findViewById(R.id.addAlbumButton).setOnClickListener(v -> createNewAlbum());
+
+        // Inform user about long press usage
+        new AlertDialog.Builder(this)
+                .setTitle("Welcome to Photo Album")
+                .setMessage("Note: Many actions such as moving, copying, or deleting items are available via long press on photos or albums.")
+                .setPositiveButton("I Understand", (dialog, which) -> dialog.dismiss())
+                .setCancelable(false)
+                .show();
     }
 
     // Load user data from DataManager

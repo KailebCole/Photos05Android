@@ -5,8 +5,12 @@ import android.os.Bundle;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -28,7 +32,7 @@ public class PhotoViewerActivity extends AppCompatActivity {
 
     private ImageView imageView;
     private TextView captionText;
-    private TextView tagListText;
+    private LinearLayout tagLayout;
     private Button nextButton, prevButton;
 
     private List<Photo> photos;
@@ -44,7 +48,7 @@ public class PhotoViewerActivity extends AppCompatActivity {
 
         imageView = findViewById(R.id.fullImageView);
         captionText = findViewById(R.id.captionTextView);
-        tagListText = findViewById(R.id.tagListTextView);
+        tagLayout = findViewById(R.id.tagLayout);
         nextButton = findViewById(R.id.nextButton);
         prevButton = findViewById(R.id.prevButton);
 
@@ -128,36 +132,84 @@ public class PhotoViewerActivity extends AppCompatActivity {
         Photo currentPhoto = photos.get(currentIndex);
         Uri photoUri = Uri.parse(currentPhoto.getFilePath());
 
-        // Display the image
         imageView.setImageURI(photoUri);
 
-        // Extract file name
         String fileName = photoUri.getLastPathSegment();
         captionText.setText(fileName != null ? fileName : "Unknown");
 
-        // Display tags
-        List<Tag> tags = currentPhoto.getTags();
-        if (tags.isEmpty()) {
-            tagListText.setText("Tags: None");
-        } else {
-            StringBuilder tagDisplay = new StringBuilder("Tags:");
-            for (Tag tag : tags) {
-                tagDisplay.append("\n• ").append(tag.toString());
-            }
-            tagListText.setText(tagDisplay.toString());
+        refreshTagDisplay(currentPhoto);
+    }
+
+    private void refreshTagDisplay(Photo photo) {
+        LinearLayout tagLayout = findViewById(R.id.tagLayout);
+        tagLayout.removeAllViews();
+
+        for (Tag tag : photo.getTags()) {
+            Button tagButton = new Button(this);
+            tagButton.setText(tag.toString() + " ❌");
+            tagButton.setTextSize(12);
+            tagButton.setOnClickListener(v -> {
+                photo.removeTag(tag);
+                DataManager.saveUser(user, this);
+                refreshTagDisplay(photo);
+            });
+            tagLayout.addView(tagButton);
         }
     }
 
+    private void addTagDialog(Photo photo) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Add Tag");
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+
+        Spinner tagTypeSpinner = new Spinner(this);
+        ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, new String[]{"Person", "Location"});
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        tagTypeSpinner.setAdapter(spinnerAdapter);
+        layout.addView(tagTypeSpinner);
+
+        EditText tagValueInput = new EditText(this);
+        tagValueInput.setHint("Enter tag value");
+        layout.addView(tagValueInput);
+
+        builder.setView(layout);
+        builder.setPositiveButton("Add", (dialog, which) -> {
+            String tagType = tagTypeSpinner.getSelectedItem().toString();
+            String tagValue = tagValueInput.getText().toString().trim();
+
+            if (!tagValue.isEmpty()) {
+                Tag newTag = new Tag(tagType, tagValue);
+                if (!photo.getTags().contains(newTag)) {
+                    photo.addTag(newTag);
+                    DataManager.saveUser(user, this);
+                    refreshTagDisplay(photo);
+                    Toast.makeText(this, "Tag added!", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "Duplicate tag", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+
+
+
     // Method to show options for the selected photo
     private void showPhotoOptionsDialog(Photo selectedPhoto) {
-        String[] options = {"Copy", "Move", "Delete"};
+        String[] options = {"Add Tag", "Copy", "Move", "Delete"};
         new AlertDialog.Builder(this)
                 .setTitle("Choose Action")
                 .setItems(options, (dialog, which) -> {
                     switch (which) {
-                        case 0: showAlbumPicker("Copy", selectedPhoto); break;
-                        case 1: showAlbumPicker("Move", selectedPhoto); break;
-                        case 2:
+                        case 0: addTagDialog(selectedPhoto); break;
+                        case 1: showAlbumPicker("Copy", selectedPhoto); break;
+                        case 2: showAlbumPicker("Move", selectedPhoto); break;
+                        case 3:
                             photos.remove(currentIndex);
                             currentAlbum.removePhoto(selectedPhoto);
                             DataManager.saveUser(user, this);

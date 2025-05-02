@@ -8,42 +8,35 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.MediaStore;
-import android.provider.OpenableColumns;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.GridView;
 import android.widget.ImageView;
+import android.widget.Spinner;
 import android.widget.Toast;
 
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.DialogInterface;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.Toast;
 
 import photos05.android.R;
 import photos05.android.model.Album;
-import photos05.android.model.Photo;
 import photos05.android.model.User;
 import photos05.android.util.DataManager;
 
 import java.io.IOException;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.appcompat.app.AppCompatActivity;
 
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import photos05.android.R;
 
 public class AlbumActivity extends AppCompatActivity{
     private static final String TAG = "AlbumActivity";
@@ -200,6 +193,7 @@ public class AlbumActivity extends AppCompatActivity{
     }
 
 
+    // Function to provide user options on long hold of what to do to a photo
     private void showPhotoOptionsDialog(int index) {
         String[] options = { "Add a Tag", "Move", "Copy", "Delete" };
 
@@ -241,69 +235,54 @@ public class AlbumActivity extends AppCompatActivity{
                 .show();
     }
 
+    // Function to tag a photo of specific tag types
     public void AddTagToPhoto(Photo photo) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Add Tag");
 
-        // Create a vertical LinearLayout to hold the two input fields
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(50, 40, 50, 10);
 
-        // Create EditText for tag name
-        final EditText tagNameInput = new EditText(this);
-        tagNameInput.setHint("Tag name (e.g., location)");
-        layout.addView(tagNameInput);
+        // Dropdown for tag type
+        final Spinner tagTypeSpinner = new Spinner(this);
+        ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, new String[]{"Person", "Location"});
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        tagTypeSpinner.setAdapter(spinnerAdapter);
+        layout.addView(tagTypeSpinner);
 
-        // Create EditText for tag value
+        // Input for tag value
         final EditText tagValueInput = new EditText(this);
-        tagValueInput.setHint("Tag value (e.g., New York)");
+        tagValueInput.setHint("Tag value");
         layout.addView(tagValueInput);
 
         builder.setView(layout);
 
-        // Add button
-        builder.setPositiveButton("Add", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                String tagName = tagNameInput.getText().toString().trim();
-                String tagValue = tagValueInput.getText().toString().trim();
+        builder.setPositiveButton("Add", (dialog, which) -> {
+            String tagName = tagTypeSpinner.getSelectedItem().toString();
+            String tagValue = tagValueInput.getText().toString().trim();
 
-                if (!tagName.isEmpty() && !tagValue.isEmpty()) {
-                    Tag myTag = new Tag(tagName,tagValue);
-                    boolean tagExists = false;
+            if (!tagValue.isEmpty()) {
+                Tag myTag = new Tag(tagName, tagValue);
+                boolean tagExists = photo.getTags().stream().anyMatch(t -> t.equals(myTag));
 
-                    for (Tag tag : photo.getTags()) {
-                        if (tag.equals(myTag)) {
-                            tagExists = true;
-                            break;
-                        }
-                    }
-
-                    if (tagExists) {
-                        Toast.makeText(AlbumActivity.this, "Tag already exists: " + myTag, Toast.LENGTH_SHORT).show();
-                    } else {
-                        photo.addTag(myTag);
-                        Toast.makeText(AlbumActivity.this, "Tag added: " + myTag, Toast.LENGTH_SHORT).show();
-                        DataManager.saveUser(user, AlbumActivity.this);
-                    }
+                if (tagExists) {
+                    Toast.makeText(this, "Tag already exists: " + myTag, Toast.LENGTH_SHORT).show();
                 } else {
-                    Toast.makeText(AlbumActivity.this, "Both tag name and value are required", Toast.LENGTH_LONG).show();
+                    photo.addTag(myTag);
+                    Toast.makeText(this, "Tag added: " + myTag, Toast.LENGTH_SHORT).show();
+                    DataManager.saveUser(user, this);
                 }
+            } else {
+                Toast.makeText(this, "Tag value is required", Toast.LENGTH_LONG).show();
             }
         });
 
-        // Cancel button
-        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                dialog.cancel();
-            }
-        });
-
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
         builder.show();
     }
 
+    // Function to move a photo from one album to another
     private void movePhotoToAlbum(Photo photo) {
         List<String> albumNames = new ArrayList<>();
         for (Album album : user.getAlbums()) {
@@ -337,7 +316,7 @@ public class AlbumActivity extends AppCompatActivity{
                 .show();
     }
 
-
+    // Function to copy a photo from one album to another
     private void copyPhotoToAlbum(Photo photo) {
         List<String> albumNames = new ArrayList<>();
         for (Album album : user.getAlbums()) {
