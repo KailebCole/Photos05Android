@@ -1,4 +1,6 @@
 package photos05.android.activities;
+import photos05.android.model.Photo;
+import photos05.android.model.Tag;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
@@ -22,6 +24,10 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import android.content.DialogInterface;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.Toast;
 
 import photos05.android.R;
 import photos05.android.model.Album;
@@ -132,34 +138,10 @@ public class AlbumActivity extends AppCompatActivity{
         });
 
         // Long click image
-        // Allows users to hold photo in order to move/copy/delete it
         gridView.setOnItemLongClickListener((parent, view, position, id) -> {
-            final String photoPath = photoPaths.get(position);
-            final Photo selectedPhoto = currentAlbum.getPhotos().stream()
-                    .filter(p -> p.getFilePath().equals(photoPath)).findFirst().orElse(null);
-
-            if (selectedPhoto == null) return true;
-
-            String[] options = {"Copy", "Move", "Delete"};
-            new AlertDialog.Builder(this)
-                    .setTitle("Choose Action")
-                    .setItems(options, (dialog, which) -> {
-                        switch (which) {
-                            case 0: showAlbumPicker("Copy", selectedPhoto); break;
-                            case 1: showAlbumPicker("Move", selectedPhoto); break;
-                            case 2:
-                                currentAlbum.removePhoto(selectedPhoto);
-                                photoPaths.remove(position);
-                                adapter.notifyDataSetChanged();
-                                DataManager.saveUser(user, this);
-                                Toast.makeText(this, "Photo deleted", Toast.LENGTH_SHORT).show();
-                                break;
-                        }
-                    }).show();
-
+            showPhotoOptionsDialog(position);
             return true;
         });
-
 
         // Implement Save/Load Capability
         selectPhotoLauncher = registerForActivityResult(
@@ -217,8 +199,112 @@ public class AlbumActivity extends AppCompatActivity{
         selectPhotoLauncher.launch(intent);
     }
 
-    // Method to show album picker dialog
-    private void showAlbumPicker(String action, Photo photo) {
+
+    private void showPhotoOptionsDialog(int index) {
+        String[] options = { "Add a Tag", "Move", "Copy", "Delete" };
+
+        new AlertDialog.Builder(this)
+                .setTitle(photoPaths.get(index))
+                .setItems(options, (dialog, which) -> {
+                    Photo selectedPhoto = null;
+                    for (Photo photo : currentAlbum.getPhotos()) {
+                        if (photo.getFilePath().equals(photoPaths.get(index))) {
+                            selectedPhoto = photo;
+                            break;
+                        }
+                    }
+
+                    if (selectedPhoto == null) return;
+
+                    switch (which) {
+                        case 0: // Add a Tag
+                            AddTagToPhoto(selectedPhoto);
+                            break;
+
+                        case 1: // Move
+                            movePhotoToAlbum(selectedPhoto);
+                            break;
+
+                        case 2: // Copy
+                            copyPhotoToAlbum(selectedPhoto);
+                            break;
+
+                        case 3: // Delete
+                            currentAlbum.removePhoto(selectedPhoto);
+                            photoPaths.remove(index);
+                            adapter.notifyDataSetChanged();
+                            DataManager.saveUser(user, this);
+                            Toast.makeText(this, "Photo deleted", Toast.LENGTH_SHORT).show();
+                            break;
+                    }
+                })
+                .show();
+    }
+
+    public void AddTagToPhoto(Photo photo) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Add Tag");
+
+        // Create a vertical LinearLayout to hold the two input fields
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+
+        // Create EditText for tag name
+        final EditText tagNameInput = new EditText(this);
+        tagNameInput.setHint("Tag name (e.g., location)");
+        layout.addView(tagNameInput);
+
+        // Create EditText for tag value
+        final EditText tagValueInput = new EditText(this);
+        tagValueInput.setHint("Tag value (e.g., New York)");
+        layout.addView(tagValueInput);
+
+        builder.setView(layout);
+
+        // Add button
+        builder.setPositiveButton("Add", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String tagName = tagNameInput.getText().toString().trim();
+                String tagValue = tagValueInput.getText().toString().trim();
+
+                if (!tagName.isEmpty() && !tagValue.isEmpty()) {
+                    Tag myTag = new Tag(tagName,tagValue);
+                    boolean tagExists = false;
+
+                    for (Tag tag : photo.getTags()) {
+                        if (tag.equals(myTag)) {
+                            tagExists = true;
+                            break;
+                        }
+                    }
+
+                    if (tagExists) {
+                        Toast.makeText(AlbumActivity.this, "Tag already exists: " + myTag, Toast.LENGTH_SHORT).show();
+                    } else {
+                        photo.addTag(myTag);
+                        Toast.makeText(AlbumActivity.this, "Tag added: " + myTag, Toast.LENGTH_SHORT).show();
+                        DataManager.saveUser(user, AlbumActivity.this);
+                    }
+                } else {
+                    Toast.makeText(AlbumActivity.this, "Both tag name and value are required", Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+
+        // Cancel button
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+
+        builder.show();
+    }
+
+    private void movePhotoToAlbum(Photo photo) {
         List<String> albumNames = new ArrayList<>();
         for (Album album : user.getAlbums()) {
             if (!album.getName().equals(currentAlbum.getName())) {
@@ -229,26 +315,53 @@ public class AlbumActivity extends AppCompatActivity{
         String[] namesArray = albumNames.toArray(new String[0]);
 
         new AlertDialog.Builder(this)
-                .setTitle(action + " to which album?")
+                .setTitle("Move to which album?")
                 .setItems(namesArray, (dialog, which) -> {
                     String selectedAlbumName = namesArray[which];
                     Album targetAlbum = user.getAlbumByName(selectedAlbumName);
                     if (targetAlbum == null) return;
 
                     try {
-                        Photo copy = new Photo(photo.getFilePath());
-                        if (action.equals("Copy")) {
-                            targetAlbum.addPhoto(copy);
-                        } else if (action.equals("Move")) {
-                            targetAlbum.addPhoto(copy);
-                            currentAlbum.removePhoto(photo);
-                            photoPaths.remove(photo.getFilePath());
-                            adapter.notifyDataSetChanged();
-                        }
+                        Photo movedPhoto = new Photo(photo.getFilePath());
+                        targetAlbum.addPhoto(movedPhoto);
+                        currentAlbum.removePhoto(photo);
+                        photoPaths.remove(photo.getFilePath());
+                        adapter.notifyDataSetChanged();
                         DataManager.saveUser(user, this);
-                        Toast.makeText(this, action + " successful", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Photo moved successfully", Toast.LENGTH_SHORT).show();
                     } catch (IOException e) {
-                        Toast.makeText(this, "Failed to " + action + " photo", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Failed to move photo", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+
+    private void copyPhotoToAlbum(Photo photo) {
+        List<String> albumNames = new ArrayList<>();
+        for (Album album : user.getAlbums()) {
+            if (!album.getName().equals(currentAlbum.getName())) {
+                albumNames.add(album.getName());
+            }
+        }
+
+        String[] namesArray = albumNames.toArray(new String[0]);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Copy to which album?")
+                .setItems(namesArray, (dialog, which) -> {
+                    String selectedAlbumName = namesArray[which];
+                    Album targetAlbum = user.getAlbumByName(selectedAlbumName);
+                    if (targetAlbum == null) return;
+
+                    try {
+                        Photo copiedPhoto = new Photo(photo.getFilePath());
+                        targetAlbum.addPhoto(copiedPhoto);
+                        DataManager.saveUser(user, this);
+                        Toast.makeText(this, "Photo copied successfully", Toast.LENGTH_SHORT).show();
+                    } catch (IOException e) {
+                        Toast.makeText(this, "Failed to copy photo", Toast.LENGTH_SHORT).show();
                     }
                 })
                 .setNegativeButton("Cancel", null)

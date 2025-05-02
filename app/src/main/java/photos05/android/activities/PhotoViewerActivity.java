@@ -142,7 +142,7 @@ public class PhotoViewerActivity extends AppCompatActivity {
         } else {
             StringBuilder tagDisplay = new StringBuilder("Tags:");
             for (Tag tag : tags) {
-                tagDisplay.append("\n• ").append(tag.getName()).append(": ").append(tag.getValue());
+                tagDisplay.append("\n• ").append(tag.toString());
             }
             tagListText.setText(tagDisplay.toString());
         }

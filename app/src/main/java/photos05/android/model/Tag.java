@@ -1,5 +1,7 @@
 package photos05.android.model;
 
+import androidx.annotation.NonNull;
+
 import java.io.Serializable;
 
 /**
@@ -65,5 +67,11 @@ public class Tag implements Serializable {
     @Override
     public int hashCode() {
         return name.hashCode() + value.hashCode();
+    }
+
+    @NonNull
+    @Override
+    public String toString() {
+        return name + " :" + value;
     }
 }
