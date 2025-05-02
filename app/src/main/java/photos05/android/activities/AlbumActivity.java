@@ -1,4 +1,6 @@
 package photos05.android.activities;
+import photos05.android.model.Photo;
+import photos05.android.model.Tag;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
@@ -22,6 +24,10 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import android.content.DialogInterface;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.Toast;
 
 import photos05.android.R;
 import photos05.android.model.Album;
@@ -133,20 +139,7 @@ public class AlbumActivity extends AppCompatActivity{
 
         // Long click image
         gridView.setOnItemLongClickListener((parent, view, position, id) -> {
-            new AlertDialog.Builder(this)
-                    .setTitle("Delete Photo")
-                    .setMessage("Are you sure you want to delete this photo from the album?")
-                    .setPositiveButton("Delete", (dialog, which) -> {
-                        String path = photoPaths.get(position);
-                        currentAlbum.getPhotos().removeIf(photo -> photo.getFilePath().equals(path));
-                        photoPaths.remove(position);
-                        adapter.notifyDataSetChanged();
-                        DataManager.saveUser(user, this);
-                        Toast.makeText(this, "Photo deleted", Toast.LENGTH_SHORT).show();
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
-
+            showPhotoOptionsDialog(position);
             return true;
         });
 
@@ -204,6 +197,105 @@ public class AlbumActivity extends AppCompatActivity{
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
         intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
         selectPhotoLauncher.launch(intent);
+    }
+
+    private void showPhotoOptionsDialog(int index) {
+        String[] options = { "Add a Tag", "Move", "Delete" };
+
+        // Create a dialog to show the options
+        new AlertDialog.Builder(this)
+                .setTitle(photoPaths.get(index))
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0:
+                            Photo myPhoto = null;
+                            for (Photo photo : currentAlbum.getPhotos()) {
+                                if (photo.getFilePath().equals(photoPaths.get(index))) {
+                                    myPhoto = photo;
+                                    break;
+                                }
+                            }
+
+                            if (myPhoto != null) {
+                                AddTagToPhoto(myPhoto);
+                            }
+                            break;
+                        case 1:
+                            break;
+                        case 2:
+                            String path = photoPaths.get(index);
+                            currentAlbum.getPhotos().removeIf(photo -> photo.getFilePath().equals(path));
+                            photoPaths.remove(index);
+                            adapter.notifyDataSetChanged();
+                            DataManager.saveUser(user, this);
+                            Toast.makeText(this, "Photo deleted", Toast.LENGTH_SHORT).show();
+                            break;
+                    }
+                })
+                .show();
+    }
+
+    public void AddTagToPhoto(Photo photo) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Add Tag");
+
+        // Create a vertical LinearLayout to hold the two input fields
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+
+        // Create EditText for tag name
+        final EditText tagNameInput = new EditText(this);
+        tagNameInput.setHint("Tag name (e.g., location)");
+        layout.addView(tagNameInput);
+
+        // Create EditText for tag value
+        final EditText tagValueInput = new EditText(this);
+        tagValueInput.setHint("Tag value (e.g., New York)");
+        layout.addView(tagValueInput);
+
+        builder.setView(layout);
+
+        // Add button
+        builder.setPositiveButton("Add", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String tagName = tagNameInput.getText().toString().trim();
+                String tagValue = tagValueInput.getText().toString().trim();
+
+                if (!tagName.isEmpty() && !tagValue.isEmpty()) {
+                    Tag myTag = new Tag(tagName,tagValue);
+                    boolean tagExists = false;
+
+                    for (Tag tag : photo.getTags()) {
+                        if (tag.equals(myTag)) {
+                            tagExists = true;
+                            break;
+                        }
+                    }
+
+                    if (tagExists) {
+                        Toast.makeText(AlbumActivity.this, "Tag already exists: " + myTag, Toast.LENGTH_SHORT).show();
+                    } else {
+                        photo.addTag(myTag);
+                        Toast.makeText(AlbumActivity.this, "Tag added: " + myTag, Toast.LENGTH_SHORT).show();
+                        DataManager.saveUser(user, AlbumActivity.this);
+                    }
+                } else {
+                    Toast.makeText(AlbumActivity.this, "Both tag name and value are required", Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+
+        // Cancel button
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+
+        builder.show();
     }
 
     @Override

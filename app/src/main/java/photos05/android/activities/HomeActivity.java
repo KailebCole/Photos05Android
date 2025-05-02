@@ -151,6 +151,4 @@ public class HomeActivity extends AppCompatActivity{
                 .setNegativeButton("Cancel", null)
                 .show();
     }
-
-
 }
