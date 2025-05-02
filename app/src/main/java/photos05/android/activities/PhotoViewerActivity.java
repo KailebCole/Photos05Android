@@ -13,6 +13,8 @@ import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import photos05.android.R;
@@ -115,31 +117,13 @@ public class PhotoViewerActivity extends AppCompatActivity {
         imageView.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
 
         imageView.setOnLongClickListener(v -> {
-            new AlertDialog.Builder(this)
-                    .setTitle("Delete Photo")
-                    .setMessage("Are you sure you want to delete this photo?")
-                    .setPositiveButton("Delete", (dialog, which) -> {
-                        if (!photos.isEmpty()) {
-                            Photo toDelete = photos.get(currentIndex);
-                            photos.remove(currentIndex);
-                            currentAlbum.getPhotos().remove(toDelete);
-                            DataManager.saveUser(user, this);
-                            Toast.makeText(this, "Photo deleted", Toast.LENGTH_SHORT).show();
-
-                            if (photos.isEmpty()) {
-                                finish();
-                            } else {
-                                currentIndex = Math.min(currentIndex, photos.size() - 1);
-                                updatePhotoView();
-                            }
-                        }
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
+            showPhotoOptionsDialog(photos.get(currentIndex));
             return true;
         });
+
     }
 
+    // Method to update the photo view with the current photo
     private void updatePhotoView() {
         Photo currentPhoto = photos.get(currentIndex);
         Uri photoUri = Uri.parse(currentPhoto.getFilePath());
@@ -164,6 +148,79 @@ public class PhotoViewerActivity extends AppCompatActivity {
         }
     }
 
+    // Method to show options for the selected photo
+    private void showPhotoOptionsDialog(Photo selectedPhoto) {
+        String[] options = {"Copy", "Move", "Delete"};
+        new AlertDialog.Builder(this)
+                .setTitle("Choose Action")
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0: showAlbumPicker("Copy", selectedPhoto); break;
+                        case 1: showAlbumPicker("Move", selectedPhoto); break;
+                        case 2:
+                            photos.remove(currentIndex);
+                            currentAlbum.removePhoto(selectedPhoto);
+                            DataManager.saveUser(user, this);
+                            Toast.makeText(this, "Photo deleted", Toast.LENGTH_SHORT).show();
+
+                            if (photos.isEmpty()) {
+                                finish();
+                            } else {
+                                currentIndex = Math.min(currentIndex, photos.size() - 1);
+                                updatePhotoView();
+                            }
+                            break;
+                    }
+                }).show();
+    }
+
+    // Method to show album picker for copying or moving photos
+    private void showAlbumPicker(String action, Photo photo) {
+        List<String> albumNames = new ArrayList<>();
+        for (Album album : user.getAlbums()) {
+            if (!album.getName().equals(currentAlbum.getName())) {
+                albumNames.add(album.getName());
+            }
+        }
+
+        String[] namesArray = albumNames.toArray(new String[0]);
+
+        new AlertDialog.Builder(this)
+                .setTitle(action + " to which album?")
+                .setItems(namesArray, (dialog, which) -> {
+                    String selectedAlbumName = namesArray[which];
+                    Album targetAlbum = user.getAlbumByName(selectedAlbumName);
+                    if (targetAlbum == null) return;
+
+                    try {
+                        Photo copy = new Photo(photo.getFilePath());
+                        if (action.equals("Copy")) {
+                            targetAlbum.addPhoto(copy);
+                        } else if (action.equals("Move")) {
+                            targetAlbum.addPhoto(copy);
+                            photos.remove(currentIndex);
+                            currentAlbum.removePhoto(photo);
+                            if (photos.isEmpty()) {
+                                DataManager.saveUser(user, this);
+                                finish();
+                                return;
+                            } else {
+                                currentIndex = Math.min(currentIndex, photos.size() - 1);
+                                updatePhotoView();
+                            }
+                        }
+
+                        DataManager.saveUser(user, this);
+                        Toast.makeText(this, action + " successful", Toast.LENGTH_SHORT).show();
+                    } catch (IOException e) {
+                        Toast.makeText(this, "Failed to " + action + " photo", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    // Method to handle swipe gestures
     private void showNextPhoto() {
         if (currentIndex < photos.size() - 1) {
             currentIndex++;
@@ -171,6 +228,7 @@ public class PhotoViewerActivity extends AppCompatActivity {
         }
     }
 
+    // Method to handle swipe gestures
     private void showPreviousPhoto() {
         if (currentIndex > 0) {
             currentIndex--;

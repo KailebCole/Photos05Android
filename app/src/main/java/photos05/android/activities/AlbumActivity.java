@@ -132,23 +132,34 @@ public class AlbumActivity extends AppCompatActivity{
         });
 
         // Long click image
+        // Allows users to hold photo in order to move/copy/delete it
         gridView.setOnItemLongClickListener((parent, view, position, id) -> {
+            final String photoPath = photoPaths.get(position);
+            final Photo selectedPhoto = currentAlbum.getPhotos().stream()
+                    .filter(p -> p.getFilePath().equals(photoPath)).findFirst().orElse(null);
+
+            if (selectedPhoto == null) return true;
+
+            String[] options = {"Copy", "Move", "Delete"};
             new AlertDialog.Builder(this)
-                    .setTitle("Delete Photo")
-                    .setMessage("Are you sure you want to delete this photo from the album?")
-                    .setPositiveButton("Delete", (dialog, which) -> {
-                        String path = photoPaths.get(position);
-                        currentAlbum.getPhotos().removeIf(photo -> photo.getFilePath().equals(path));
-                        photoPaths.remove(position);
-                        adapter.notifyDataSetChanged();
-                        DataManager.saveUser(user, this);
-                        Toast.makeText(this, "Photo deleted", Toast.LENGTH_SHORT).show();
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
+                    .setTitle("Choose Action")
+                    .setItems(options, (dialog, which) -> {
+                        switch (which) {
+                            case 0: showAlbumPicker("Copy", selectedPhoto); break;
+                            case 1: showAlbumPicker("Move", selectedPhoto); break;
+                            case 2:
+                                currentAlbum.removePhoto(selectedPhoto);
+                                photoPaths.remove(position);
+                                adapter.notifyDataSetChanged();
+                                DataManager.saveUser(user, this);
+                                Toast.makeText(this, "Photo deleted", Toast.LENGTH_SHORT).show();
+                                break;
+                        }
+                    }).show();
 
             return true;
         });
+
 
         // Implement Save/Load Capability
         selectPhotoLauncher = registerForActivityResult(
@@ -205,6 +216,45 @@ public class AlbumActivity extends AppCompatActivity{
         intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
         selectPhotoLauncher.launch(intent);
     }
+
+    // Method to show album picker dialog
+    private void showAlbumPicker(String action, Photo photo) {
+        List<String> albumNames = new ArrayList<>();
+        for (Album album : user.getAlbums()) {
+            if (!album.getName().equals(currentAlbum.getName())) {
+                albumNames.add(album.getName());
+            }
+        }
+
+        String[] namesArray = albumNames.toArray(new String[0]);
+
+        new AlertDialog.Builder(this)
+                .setTitle(action + " to which album?")
+                .setItems(namesArray, (dialog, which) -> {
+                    String selectedAlbumName = namesArray[which];
+                    Album targetAlbum = user.getAlbumByName(selectedAlbumName);
+                    if (targetAlbum == null) return;
+
+                    try {
+                        Photo copy = new Photo(photo.getFilePath());
+                        if (action.equals("Copy")) {
+                            targetAlbum.addPhoto(copy);
+                        } else if (action.equals("Move")) {
+                            targetAlbum.addPhoto(copy);
+                            currentAlbum.removePhoto(photo);
+                            photoPaths.remove(photo.getFilePath());
+                            adapter.notifyDataSetChanged();
+                        }
+                        DataManager.saveUser(user, this);
+                        Toast.makeText(this, action + " successful", Toast.LENGTH_SHORT).show();
+                    } catch (IOException e) {
+                        Toast.makeText(this, "Failed to " + action + " photo", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
 
     @Override
     protected void onResume() {

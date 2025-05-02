@@ -1,0 +1,37 @@
+During the development of this application, I found the use of ChatGPT to be incredibly helpful in
+the initial setup and configuration of the project on Android Studio. In addition to this, I also
+utilized ChatGPT to assist with the implementation of serialization within the android environment.
+Some of the prompts used for these concepts include the following:
+
+Please summarize the requirements for this project and provide some advice for working in android
+studio and porting some of my former photo album project from java pc to java android. Note: only
+java code is allowed, XML files should be used for formatting, it must run on the android emulator
+in android studio, and should include all functionality in the requirements document. I have also
+included previous files used in my photo album project created previously for your review. if you
+need further references, i also have the code for the controllers and general fxml layout files.
+Please present your information in a readable format that is easily digestable and understandable
+and also provide a general plan to go about working on this port. I have included the additional
+code files that I have written for the previous project for your reference. Can you please explain
+a little more about working in android studio and start by helping me to set up the home screen for
+the user?
+
+From here, it provided general suggestioins about organizing the files and working in Android Studio.
+However, I still struggled at first with getting it opperational and running on the emulator so I
+asked the following:
+
+I have just installed android studio, can you walk me through setting up the project before we begin
+Please note that the language must be initialized to Java exclusively as Kotlin is not permitted
+
+Then for serialization, I prompted ChatGPT with:
+
+Currently, I believe there are issues with the albums not being serialized/saved. Can we attempt to
+solve this problem first and then work from there? Here is the log file created from running and
+attempting to open an image, currently the files are not being saved between sessions and needs to
+be fixed
+
+From here, it thoroughly explained accessing URI's in the Android environment and how to implement
+them in application.
+
+Other than this, ChatGPT was mostly used for bug fixing and summarizing long error strings output
+by Logcat within Android Studio. This allwoed for faster development and error correction than
+having to sort through each log output line by line.
