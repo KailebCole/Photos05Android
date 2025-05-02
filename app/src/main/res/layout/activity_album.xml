@@ -27,6 +27,15 @@
         android:gravity="center"/>
 
     <Button
+        android:id="@+id/searchButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Search By Tag"
+        android:layout_marginTop="10dp"
+        android:background="@color/dark_magenta"
+        android:textColor="#FFFFFF"/>
+
+    <Button
         android:id="@+id/addPhotoButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
