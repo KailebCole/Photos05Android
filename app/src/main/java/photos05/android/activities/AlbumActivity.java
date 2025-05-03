@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.GridView;
 import android.widget.ImageView;
@@ -36,7 +37,9 @@ import androidx.activity.result.contract.ActivityResultContracts;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class AlbumActivity extends AppCompatActivity{
     private static final String TAG = "AlbumActivity";
@@ -56,6 +59,9 @@ public class AlbumActivity extends AppCompatActivity{
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_album);
+
+        // Get User
+        user = DataManager.loadUser(this);
 
         // Image Sizes based on Screen Size
         DisplayMetrics metrics = new DisplayMetrics();
@@ -82,8 +88,26 @@ public class AlbumActivity extends AppCompatActivity{
             showSearchDialog();
         });
 
-        // Get User
-        user = DataManager.loadUser(this);
+        Spinner tagTypeSpinner = findViewById(R.id.tagTypeSpinner);
+        AutoCompleteTextView tagValueInput = findViewById(R.id.searchTagValueInput);
+
+        // Setup spinner values
+        ArrayAdapter<String> tagTypeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new String[]{"Person", "Location"});
+        tagTypeSpinner.setAdapter(tagTypeAdapter);
+
+        // Gather unique tag values from all albums
+        Set<String> allTagValues = new HashSet<>();
+        for (Album album : user.getAlbums()) {
+            for (Photo photo : album.getPhotos()) {
+                for (Tag tag : photo.getTags()) {
+                    allTagValues.add(tag.getValue());
+                }
+            }
+        }
+
+        // Setup AutoComplete suggestions
+        ArrayAdapter<String> autoCompleteAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>(allTagValues));
+        tagValueInput.setAdapter(autoCompleteAdapter);
 
         Log.d(TAG, "onCreate: Add Photo Button created");
 
@@ -204,52 +228,113 @@ public class AlbumActivity extends AppCompatActivity{
     }
 
     private void promptForTags(String mode) {
-        AlertDialog.Builder inputBuilder = new AlertDialog.Builder(this);
-        inputBuilder.setTitle("Enter Tag(s)");
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Search by Tag");
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(50, 40, 50, 10);
 
-        // First Tag
-        EditText tagNameInput1 = new EditText(this);
-        tagNameInput1.setHint("Tag 1 Name (e.g., location)");
-        layout.addView(tagNameInput1);
+        // Dropdown for tag types
+        Spinner tagTypeSpinner1 = new Spinner(this);
+        ArrayAdapter<String> tagTypeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, new String[]{"Location", "Person"});
+        tagTypeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        tagTypeSpinner1.setAdapter(tagTypeAdapter);
+        layout.addView(tagTypeSpinner1);
 
-        EditText tagValueInput1 = new EditText(this);
-        tagValueInput1.setHint("Tag 1 Value (e.g., Paris)");
+        // Autocomplete for tag values
+        final AutoCompleteTextView tagValueInput1 = new AutoCompleteTextView(this);
+        tagValueInput1.setHint("Tag value");
+        ArrayAdapter<String> autoCompleteAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>(getAllTagValues()));
+        tagValueInput1.setAdapter(autoCompleteAdapter);
+        tagValueInput1.setThreshold(1);
         layout.addView(tagValueInput1);
 
-        // Second Tag if needed
-        EditText tagNameInput2 = new EditText(this);
-        EditText tagValueInput2 = new EditText(this);
+        final Spinner tagTypeSpinner2;
+        final AutoCompleteTextView tagValueInput2;
 
         if (!mode.equals("Single Tag")) {
-            tagNameInput2.setHint("Tag 2 Name (e.g., activity)");
-            tagValueInput2.setHint("Tag 2 Value (e.g., running)");
-            layout.addView(tagNameInput2);
+            tagTypeSpinner2 = new Spinner(this);
+            tagTypeSpinner2.setAdapter(tagTypeAdapter);
+            layout.addView(tagTypeSpinner2);
+
+            tagValueInput2 = new AutoCompleteTextView(this);
+            tagValueInput2.setHint("Second tag value");
+            tagValueInput2.setAdapter(autoCompleteAdapter);
+            tagValueInput2.setThreshold(1);
             layout.addView(tagValueInput2);
+        } else {
+            tagTypeSpinner2 = null;
+            tagValueInput2 = null;
         }
 
-        inputBuilder.setView(layout);
+        builder.setView(layout);
 
-        inputBuilder.setPositiveButton("Search", (dialog, which) -> {
-            Tag tag1 = new Tag(tagNameInput1.getText().toString().trim(),
-                    tagValueInput1.getText().toString().trim());
+        builder.setPositiveButton("Search", (dialog, which) -> {
+            String tagType1 = tagTypeSpinner1.getSelectedItem().toString();
+            String tagValue1 = tagValueInput1.getText().toString().trim();
 
-            Tag tag2 = null;
-            if (!mode.equals("Single Tag")) {
-                tag2 = new Tag(tagNameInput2.getText().toString().trim(),
-                        tagValueInput2.getText().toString().trim());
+            final String tagType2 = tagTypeSpinner2 != null ? tagTypeSpinner2.getSelectedItem().toString() : null;
+            final String tagValue2 = tagValueInput2 != null ? tagValueInput2.getText().toString().trim() : null;
+
+            List<String> matches = new ArrayList<>();
+
+            for (Album album : user.getAlbums()) {
+                for (Photo photo : album.getPhotos()) {
+                    boolean match1 = photo.getTags().stream().anyMatch(
+                            tag -> tag.getName().equalsIgnoreCase(tagType1) &&
+                                    tag.getValue().toLowerCase().startsWith(tagValue1.toLowerCase())
+                    );
+
+                    boolean match2 = tagType2 != null && photo.getTags().stream().anyMatch(
+                            tag -> tag.getName().equalsIgnoreCase(tagType2) &&
+                                    tag.getValue().toLowerCase().startsWith(tagValue2.toLowerCase())
+                    );
+
+                    boolean shouldInclude;
+                    switch (mode) {
+                        case "Single Tag":
+                            shouldInclude = match1;
+                            break;
+                        case "Tag OR Tag":
+                            shouldInclude = match1 || match2;
+                            break;
+                        case "Tag AND Tag":
+                            shouldInclude = match1 && match2;
+                            break;
+                        default:
+                            shouldInclude = false;
+                            break;
+                    }
+
+                    if (shouldInclude && !matches.contains(photo.getFilePath())) {
+                        matches.add(photo.getFilePath());
+                    }
+                }
             }
 
-            runTagSearch(mode, tag1, tag2);
+            photoPaths.clear();
+            photoPaths.addAll(matches);
+            adapter.notifyDataSetChanged();
+
+            if (matches.isEmpty()) {
+                Toast.makeText(this, "No matches found.", Toast.LENGTH_SHORT).show();
+            }
+
+            Intent intent = new Intent(AlbumActivity.this, PhotoViewerActivity.class);
+            intent.putExtra("albumName", currentAlbum.getName()); // or a dummy name
+            intent.putExtra("photoIndex", 0);
+            intent.putStringArrayListExtra("photoPaths", new ArrayList<>(matches));
+            startActivity(intent);
+
         });
 
-        inputBuilder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
 
-        inputBuilder.show();
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+
+        builder.show();
     }
+
 
     private void runTagSearch(String mode, Tag tag1, Tag tag2) {
         photoPaths.clear();
@@ -281,6 +366,19 @@ public class AlbumActivity extends AppCompatActivity{
 
         adapter.notifyDataSetChanged();
     }
+
+    private Set<String> getAllTagValues() {
+        Set<String> tagValues = new HashSet<>();
+        for (Album album : user.getAlbums()) {
+            for (Photo photo : album.getPhotos()) {
+                for (Tag tag : photo.getTags()) {
+                    tagValues.add(tag.getValue());
+                }
+            }
+        }
+        return tagValues;
+    }
+
 
     private boolean containsTag(List<Tag> tags, Tag target) {
         for (Tag tag : tags) {

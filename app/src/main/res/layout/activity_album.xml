@@ -26,6 +26,23 @@
         android:stretchMode="columnWidth"
         android:gravity="center"/>
 
+    <AutoCompleteTextView
+        android:id="@+id/searchTagValueInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Start typing tag value..."
+        android:inputType="text"
+        android:layout_marginTop="8dp"
+        />
+
+    <Spinner
+        android:id="@+id/tagTypeSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        />
+
+
     <Button
         android:id="@+id/searchButton"
         android:layout_width="match_parent"

@@ -1,5 +1,6 @@
 package photos05.android.activities;
 
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.GestureDetector;
@@ -48,7 +49,7 @@ public class PhotoViewerActivity extends AppCompatActivity {
 
         imageView = findViewById(R.id.fullImageView);
         captionText = findViewById(R.id.captionTextView);
-        tagLayout = findViewById(R.id.tagLayout);
+        tagLayout = findViewById(R.id.tagContainer);
         nextButton = findViewById(R.id.nextButton);
         prevButton = findViewById(R.id.prevButton);
 
@@ -123,21 +124,39 @@ public class PhotoViewerActivity extends AppCompatActivity {
     }
 
     private void refreshTagDisplay(Photo photo) {
-        LinearLayout tagLayout = findViewById(R.id.tagLayout);
-        tagLayout.removeAllViews();
+        LinearLayout tagContainer = findViewById(R.id.tagContainer);
+        tagContainer.removeAllViews();
 
         for (Tag tag : photo.getTags()) {
-            Button tagButton = new Button(this);
-            tagButton.setText(tag.toString() + " ❌");
-            tagButton.setTextSize(12);
-            tagButton.setOnClickListener(v -> {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setPadding(10, 10, 10, 10);
+            row.setBackgroundColor(Color.LTGRAY);
+
+            TextView tagText = new TextView(this);
+            tagText.setText(tag.toString());
+            tagText.setTextSize(14);
+            tagText.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+            Button deleteBtn = new Button(this);
+            deleteBtn.setText("X");
+            deleteBtn.setOnClickListener(v -> {
                 photo.removeTag(tag);
                 DataManager.saveUser(user, this);
                 refreshTagDisplay(photo);
             });
-            tagLayout.addView(tagButton);
+
+            row.addView(tagText);
+            row.addView(deleteBtn);
+            tagContainer.addView(row);
         }
+
+        Button addTagBtn = new Button(this);
+        addTagBtn.setText("+");
+        addTagBtn.setOnClickListener(v -> addTagDialog(photo));
+        tagContainer.addView(addTagBtn);
     }
+
 
     private void addTagDialog(Photo photo) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
